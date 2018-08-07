@@ -248,15 +248,14 @@ biosmem_unregister_boot_data(phys_addr_t start, phys_addr_t end)
 #ifndef MACH_HYP
 
 static void __boot
-biosmem_map_build(const struct multiboot_raw_info *mbi)
+biosmem_map_build(const struct multiboot2_mmap_tag *mtag)
 {
-    struct multiboot_raw_mmap_entry *mb_entry, *mb_end;
+    void *base_entry_addr = (void *)mtag + 16;
+    struct multiboot2_raw_mmap_entry *mb_entry, *mb_end;
     struct biosmem_map_entry *start, *entry, *end;
-    unsigned long addr;
 
-    addr = phystokv(mbi->mmap_addr);
-    mb_entry = (struct multiboot_raw_mmap_entry *)addr;
-    mb_end = (struct multiboot_raw_mmap_entry *)(addr + mbi->mmap_length);
+    mb_entry = (struct multiboot2_raw_mmap_entry *)base_entry_addr;
+    mb_end = (struct multiboot2_raw_mmap_entry *)(base_entry_addr + mtag->size - 16);
     start = biosmem_map;
     entry = start;
     end = entry + BIOSMEM_MAX_MAP_SIZE;
@@ -266,7 +265,7 @@ biosmem_map_build(const struct multiboot_raw_info *mbi)
         entry->length = mb_entry->length;
         entry->type = mb_entry->type;
 
-        mb_entry = (void *)mb_entry + sizeof(mb_entry->size) + mb_entry->size;
+        mb_entry = (void *)mb_entry + mtag->entry_size;
         entry++;
     }
 
@@ -274,18 +273,39 @@ biosmem_map_build(const struct multiboot_raw_info *mbi)
 }
 
 static void __boot
-biosmem_map_build_simple(const struct multiboot_raw_info *mbi)
+biosmem_map_find_largest_block(phys_addr_t *start, phys_addr_t *end)
+{
+	struct biosmem_map_entry *entry, *map_temp;
+	phys_addr_t best_start = 0, best_end = 0;
+	
+	map_temp = biosmem_map;
+	entry = map_temp;
+	while((entry-map_temp) < biosmem_map_size)
+	{
+		if(entry->length > (best_end-best_start))
+		{
+			best_start = entry->base_addr;
+			best_end = entry->base_addr+entry->length;
+		}
+		entry++;
+	}
+	if(best_start != 0) *start = best_start;
+	if(best_end != 0) *end = best_end;
+}
+
+static void __boot
+biosmem_map_build_simple(const struct multiboot2_basicmem_tag *mtag)
 {
     struct biosmem_map_entry *entry;
 
     entry = biosmem_map;
     entry->base_addr = 0;
-    entry->length = mbi->mem_lower << 10;
+    entry->length = mtag->mem_lower << 10;
     entry->type = BIOSMEM_TYPE_AVAILABLE;
 
     entry++;
     entry->base_addr = BIOSMEM_END;
-    entry->length = mbi->mem_upper << 10;
+    entry->length = mtag->mem_upper << 10;
     entry->type = BIOSMEM_TYPE_AVAILABLE;
 
     biosmem_map_size = 2;
@@ -607,6 +627,10 @@ biosmem_setup_allocator(const struct multiboot_raw_info *mbi)
      * upper memory, carefully avoiding all boot data.
      */
     end = vm_page_trunc((mbi->mem_upper + 1024) << 10);
+    
+    /* CVP FIX: mbi->mem_upper + 1024 is simply the first memory hole */
+    /* There may well be more memory at even higher addresses */
+    biosmem_map_find_largest_block(&start, &end);
 
 #ifndef __LP64__
     if (end > VM_PAGE_DIRECTMAP_LIMIT)

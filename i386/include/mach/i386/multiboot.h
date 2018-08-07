@@ -25,6 +25,8 @@
 
 #include <mach/machine/vm_types.h>
 
+#ifdef ACKNOWLEDGE_MULTIBOOT_PROBS
+
 /* For a.out kernel boot images, the following header must appear
    somewhere in the first 8192 bytes of the kernel image file.  */
 struct multiboot_header
@@ -293,5 +295,27 @@ struct multiboot_os_info {
     struct multiboot_module *mods_addr;
     uint32_t mods_count;
 };
+#endif /* ACKNOWLEDGE_MULTIBOOT_PROBS */
+
+struct multiboot2_basicmem_tag {
+	uint32_t type;
+	uint32_t size;
+	uint32_t mem_lower;
+	uint32_t mem_upper;
+} __packed;
+
+struct multiboot2_mmap_tag {
+	uint32_t type;
+	uint32_t size;
+	uint32_t entry_size;
+	uint32_t entry_version;
+} __packed;
+
+struct multiboot2_raw_mmap_entry {
+	uint64_t base_addr;
+	uint64_t length;
+	uint32_t type;
+	uint32_t reserved;
+} __packed;
 
 #endif /* _MACH_I386_MULTIBOOT_H_ */

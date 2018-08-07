@@ -65,7 +65,7 @@ void biosmem_register_boot_data(phys_addr_t start, phys_addr_t end,
 #ifdef MACH_HYP
 void biosmem_xen_bootstrap(void);
 #else /* MACH_HYP */
-void biosmem_bootstrap(const struct multiboot_raw_info *mbi);
+void biosmem_bootstrap(const void *mbi);
 #endif /* MACH_HYP */
 
 /*

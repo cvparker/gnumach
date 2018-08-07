@@ -89,7 +89,14 @@ extern char *kernel_cmdline;
 void setup_main(void)
 {
 	thread_t		startup_thread;
-
+	
+	volatile int dontrun = 1;
+	volatile int counter = 0;
+	while(dontrun)
+	{
+		counter++;
+	}
+	
 #if	MACH_KDB
 	/*
 	 * Cause a breakpoint trap to the debugger before proceeding

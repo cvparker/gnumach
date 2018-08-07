@@ -2,6 +2,7 @@
 #include <mach/machine/asm.h>
 
 #include <i386/i386asm.h>
+#define __MULTIBOOT2__
 
 	/*
 	 * This section will be put first into .text.  See also	i386/ldscript.
@@ -15,14 +16,95 @@ _start:
 	jmp	boot_entry
 
 	/* MultiBoot header - see multiboot.h.  */
+	
+	P2ALIGN(3)
+boot_hdr:
+
+#ifdef __MULTIBOOT2__
+
+#define MULTIBOOT2_MAGIC		0xE85250D6
+#define MULTIBOOT2_ARCH_I386		0x00000000
+#define MULTIBOOT2_OPTIONAL		0x00010000
+#define MULTIBOOT2_TAG_INFO_REQ 	1
+#define MULTIBOOT2_TAG_CONSOLE_FLAGS	4
+#define MULTIBOOT2_TAG_FRAME_BUF	5
+#define MULTIBOOT2_TAG_MODULE_ALIGN	6
+#define MULTIBOOT2_EFI_SERVICES		7
+
+#define MULTIBOOT2_INFO_REQ_CMD_LINE	1
+#define MULTIBOOT2_INFO_REQ_MODS	3
+#define MULTIBOOT2_INFO_REQ_MEM_MAP	6
+#define MULTIBOOT2_INFO_REQ_FRAME_BUF	8
+#define MULTIBOOT2_INFO_REQ_ELF_SYM	9
+
+#define MULTIBOOT2_CONSOLE_FLAGS_EGA	(1 << 1)
+
+	/* Multiboot2 Header Common Part */
+	
+	.long MULTIBOOT2_MAGIC
+	.long MULTIBOOT2_ARCH_I386
+	.long (boot_entry-boot_hdr)
+	.long -(MULTIBOOT2_MAGIC + MULTIBOOT2_ARCH_I386 + (boot_entry-boot_hdr))
+	
+	/* Tags */
+
+	/* Info Request */
+	P2ALIGN(3)
+info_req_start:
+	.long MULTIBOOT2_TAG_INFO_REQ
+	.long (info_req_end-info_req_start)
+	.long MULTIBOOT2_INFO_REQ_CMD_LINE
+	.long MULTIBOOT2_INFO_REQ_MODS
+	.long MULTIBOOT2_INFO_REQ_MEM_MAP
+	.long MULTIBOOT2_INFO_REQ_FRAME_BUF
+	.long MULTIBOOT2_INFO_REQ_ELF_SYM
+info_req_end:
+
+	/* Console Flags */
+	P2ALIGN(3)
+console_flags_start:
+	.long MULTIBOOT2_TAG_CONSOLE_FLAGS
+	.long (console_flags_end-console_flags_start)
+	.long MULTIBOOT2_CONSOLE_FLAGS_EGA
+console_flags_end:
+
+	/* Frame Buffer */
+	P2ALIGN(3)
+frame_buffer_start:
+	.long MULTIBOOT2_TAG_FRAME_BUF
+	.long (frame_buffer_end-frame_buffer_start)
+	.long 80
+	.long 24
+	.long 0
+frame_buffer_end:
+
+	/* Module Align */
+	P2ALIGN(3)
+module_align_start:
+	.long MULTIBOOT2_TAG_MODULE_ALIGN
+	.long (module_align_end-module_align_start)
+module_align_end:
+
+	/* EFI Services Tag */
+	P2ALIGN(3)
+efi_services_start:
+	.long MULTIBOOT2_EFI_SERVICES
+	.long (efi_services_end-efi_services_start)
+efi_services_end:
+
+	/* Terminating empty tag */
+	P2ALIGN(3)
+	.long 0
+	.long 8
+#else
 #define	MULTIBOOT_MAGIC		0x1BADB002
 #ifdef __ELF__
 #define MULTIBOOT_FLAGS		0x00000003
 #else  /* __ELF__ */
 #define MULTIBOOT_FLAGS		0x00010003
 #endif /* __ELF__ */
-	P2ALIGN(2)
-boot_hdr:
+
+
 	.long	MULTIBOOT_MAGIC
 	.long	MULTIBOOT_FLAGS
 		/*
@@ -37,7 +119,7 @@ boot_hdr:
 	.long	_end		/* bss_end_addr */
 	.long	boot_entry	/* entry */
 #endif /* __ELF__ */
-
+#endif /* __MULTIBOOT2__ */
 boot_entry:
 	/* use segmentation to offset ourself. */
 	lgdt	boot_gdt_descr - KERNELBASE

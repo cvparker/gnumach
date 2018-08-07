@@ -527,6 +527,13 @@ i386at_init(void)
  */
 void c_boot_entry(vm_offset_t bi)
 {
+	volatile int dontrun = 1;
+	volatile int counter = 0;
+	while(dontrun)
+	{
+		counter++;
+	}
+	
 #if	ENABLE_IMMEDIATE_CONSOLE
 	romputc = immc_romputc;
 #endif	/* ENABLE_IMMEDIATE_CONSOLE */

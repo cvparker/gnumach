@@ -64,6 +64,7 @@
 #include <oskit/c/stdio.h>
 #define safe_gets(s, n) fgets((s),(n),stdin)
 #else
+#define ACKNOWLEDGE_MULTIBOOT_PROBS
 #include <mach/machine/multiboot.h>
 #include <mach/exec/exec.h>
 #ifdef	MACH_XEN
