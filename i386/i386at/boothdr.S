@@ -69,14 +69,14 @@ console_flags_start:
 console_flags_end:
 
 	/* Frame Buffer */
-	P2ALIGN(3)
+	/*P2ALIGN(3)
 frame_buffer_start:
 	.long MULTIBOOT2_TAG_FRAME_BUF
 	.long (frame_buffer_end-frame_buffer_start)
 	.long 80
 	.long 24
 	.long 0
-frame_buffer_end:
+frame_buffer_end:*/
 
 	/* Module Align */
 	P2ALIGN(3)
@@ -86,11 +86,11 @@ module_align_start:
 module_align_end:
 
 	/* EFI Services Tag */
-	P2ALIGN(3)
+	/*P2ALIGN(3)
 efi_services_start:
 	.long MULTIBOOT2_EFI_SERVICES
 	.long (efi_services_end-efi_services_start)
-efi_services_end:
+efi_services_end:*/
 
 	/* Terminating empty tag */
 	P2ALIGN(3)

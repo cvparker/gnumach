@@ -66,6 +66,7 @@
 #include <i386/model_dep.h>
 #include <i386at/autoconf.h>
 #include <i386at/biosmem.h>
+#include <i386at/mb_parse.h>
 #include <i386at/elf.h>
 #include <i386at/idt.h>
 #include <i386at/int_init.h>
@@ -118,7 +119,7 @@ unsigned long *pfn_list = (void*) PFN_LIST;
 unsigned long la_shift = VM_MIN_KERNEL_ADDRESS;
 #endif
 #else	/* MACH_XEN */
-struct multiboot_info boot_info;
+void *boot_info;
 #endif	/* MACH_XEN */
 
 /* Command line supplied to kernel.  */
@@ -269,59 +270,28 @@ void db_reset_cpu(void)
 #ifndef	MACH_HYP
 
 static void
-register_boot_data(const struct multiboot_raw_info *mbi)
+register_boot_data(const void *mbi)
 {
-	struct multiboot_raw_module *mod;
-	struct elf_shdr *shdr;
-	unsigned long tmp;
-	unsigned int i;
+	struct multiboot2_start_tag *mbi_start;
+	struct multiboot2_module_tag *mb_mod;
 
 	extern char _start[], _end[];
 
+	mbi_start = (struct multiboot2_start_tag *)mbi;
+	mb_mod = (struct multiboot2_module_tag *)multiboot2_get_tag(mbi, MULTIBOOT2_TAG_MODULE);
+	
 	biosmem_register_boot_data(_kvtophys(&_start), _kvtophys(&_end), FALSE);
 
-	/* cmdline and modules are moved to a safe place by i386at_init.  */
-
-	if ((mbi->flags & MULTIBOOT_LOADER_CMDLINE) && (mbi->cmdline != 0)) {
-		biosmem_register_boot_data(mbi->cmdline,
-					   mbi->cmdline
-					   + strlen((void *)phystokv(mbi->cmdline)) + 1, TRUE);
-	}
-
-	if (mbi->flags & MULTIBOOT_LOADER_MODULES) {
-		i = mbi->mods_count * sizeof(struct multiboot_raw_module);
-		biosmem_register_boot_data(mbi->mods_addr, mbi->mods_addr + i, TRUE);
-
-		tmp = phystokv(mbi->mods_addr);
-
-		for (i = 0; i < mbi->mods_count; i++) {
-			mod = (struct multiboot_raw_module *)tmp + i;
-			biosmem_register_boot_data(mod->mod_start, mod->mod_end, TRUE);
-
-			if (mod->string != 0) {
-				biosmem_register_boot_data(mod->string,
-							   mod->string
-							   + strlen((void *)phystokv(mod->string)) + 1,
-							   TRUE);
-			}
-		}
-	}
-
-	if (mbi->flags & MULTIBOOT_LOADER_SHDR) {
-		tmp = mbi->shdr_num * mbi->shdr_size;
-		biosmem_register_boot_data(mbi->shdr_addr, mbi->shdr_addr + tmp, FALSE);
-
-		tmp = phystokv(mbi->shdr_addr);
-
-		for (i = 0; i < mbi->shdr_num; i++) {
-			shdr = (struct elf_shdr *)(tmp + (i * mbi->shdr_size));
-
-			if ((shdr->type != ELF_SHT_SYMTAB)
-			    && (shdr->type != ELF_SHT_STRTAB))
-				continue;
-
-			biosmem_register_boot_data(shdr->addr, shdr->addr + shdr->size, FALSE);
-		}
+	/* mb tags, cmdline, and modules are moved to a safe place by i386at_init.  */
+	/* this happens later, so we mark temporary */
+	
+	/* multiboot2 tags (command line is a tag also) */
+	biosmem_register_boot_data(_kvtophys(mbi), _kvtophys(mbi)+(mbi_start->total_size), TRUE);
+	
+	/* multiboot2 modules */
+	while(mb_mod != NULL) {
+		biosmem_register_boot_data(mb_mod->mod_start, mb_mod->mod_end, TRUE);
+		mb_mod = (struct multiboot2_module_tag *)multiboot2_get_tag_after(mbi, MULTIBOOT2_TAG_MODULE, mb_mod);
 	}
 }
 
@@ -354,8 +324,8 @@ i386at_init(void)
 #ifdef MACH_HYP
 	biosmem_xen_bootstrap();
 #else /* MACH_HYP */
-	register_boot_data((struct multiboot_raw_info *) &boot_info);
-	biosmem_bootstrap((struct multiboot_raw_info *) &boot_info);
+	register_boot_data(boot_info);
+	biosmem_bootstrap(boot_info);
 #endif /* MACH_HYP */
 
 #ifdef MACH_XEN
@@ -364,42 +334,37 @@ i386at_init(void)
 	/* Copy content pointed by boot_info before losing access to it when it
 	 * is too far in physical memory.
 	 * Also avoids leaving them in precious areas such as DMA memory.  */
-	if (boot_info.flags & MULTIBOOT_CMDLINE) {
-		int len = strlen ((char*)phystokv(boot_info.cmdline)) + 1;
-		if (! init_alloc_aligned(round_page(len), &addr))
-		  panic("could not allocate memory for multiboot command line");
+	
+	/* First copy the multiboot2 tags */
+	int len = ((struct multiboot2_start_tag *)boot_info)->total_size;
+	if (! init_alloc_aligned(round_page(len), &addr))
+		panic("could not allocate memory for multiboot2 tags");
+	memcpy((char *)phystokv(addr), boot_info, len);
+	boot_info = (void *)phystokv(addr);
+
+	/* Now find and copy the command line, if extant */
+	const struct multiboot2_cmdline_tag *cmd_line;
+	cmd_line = (const struct multiboot2_cmdline_tag *)multiboot2_get_tag(boot_info, MULTIBOOT2_TAG_CMDLINE);
+	if (cmd_line != NULL) {
+		if (! init_alloc_aligned(round_page(cmd_line->size - 8), &addr))
+			panic("could not allocate memory for multiboot2 command line");
 		kernel_cmdline = (char*) phystokv(addr);
-		memcpy(kernel_cmdline, (void *)phystokv(boot_info.cmdline), len);
-		boot_info.cmdline = addr;
+		memcpy(kernel_cmdline, (void *)phystokv(cmd_line->string), len);
 	}
-
-	if (boot_info.flags & MULTIBOOT_MODS) {
-		struct multiboot_module *m;
-		int i;
-
-		if (! init_alloc_aligned(
-			round_page(boot_info.mods_count * sizeof(*m)), &addr))
-		  panic("could not allocate memory for multiboot modules");
-		m = (void*) phystokv(addr);
-		memcpy(m, (void*) phystokv(boot_info.mods_addr), boot_info.mods_count * sizeof(*m));
-		boot_info.mods_addr = addr;
-
-		for (i = 0; i < boot_info.mods_count; i++) {
-			vm_size_t size = m[i].mod_end - m[i].mod_start;
-			if (! init_alloc_aligned(round_page(size), &addr))
-			  panic("could not allocate memory for multiboot "
-				"module %d", i);
-			memcpy((void*) phystokv(addr), (void*) phystokv(m[i].mod_start), size);
-			m[i].mod_start = addr;
-			m[i].mod_end = addr + size;
-
-			size = strlen((char*) phystokv(m[i].string)) + 1;
-			if (! init_alloc_aligned(round_page(size), &addr))
-			  panic("could not allocate memory for multiboot "
-				"module command line %d", i);
-			memcpy((void*) phystokv(addr), (void*) phystokv(m[i].string), size);
-			m[i].string = addr;
-		}
+	
+	/* Copy all the modules (their command lines are copied with the tags) */
+	struct multiboot2_module_tag *m;
+	m = (struct multiboot2_module_tag *)multiboot2_get_tag(boot_info, MULTIBOOT2_TAG_MODULE);
+	i = 0;
+	while (m != NULL) {
+		vm_size_t size = m->mod_end - m->mod_start;
+		if (! init_alloc_aligned(round_page(size), &addr))
+			panic("could not allocate memory for multiboot2 module %d", i);
+		memcpy((void*) phystokv(addr), (void*) phystokv(m->mod_start), size);
+		m->mod_start = addr;
+		m->mod_end = addr + size;
+		m = (struct multiboot2_module_tag *)multiboot2_get_tag_after(boot_info, MULTIBOOT2_TAG_MODULE, m);
+		++i;
 	}
 #endif	/* MACH_XEN */
 
@@ -527,19 +492,20 @@ i386at_init(void)
  */
 void c_boot_entry(vm_offset_t bi)
 {
-	volatile int dontrun = 1;
+	/*volatile int dontrun = 1;
 	volatile int counter = 0;
 	while(dontrun)
 	{
 		counter++;
-	}
-	
+	}*/
+
 #if	ENABLE_IMMEDIATE_CONSOLE
+#error GORILLA_BANANA
 	romputc = immc_romputc;
 #endif	/* ENABLE_IMMEDIATE_CONSOLE */
 
 	/* Stash the boot_image_info pointer.  */
-	boot_info = *(typeof(boot_info)*)phystokv(bi);
+	boot_info = (void *)phystokv(bi);
 	int cpu_type;
 
 	/* Before we do _anything_ else, print the hello message.
@@ -563,6 +529,7 @@ void c_boot_entry(vm_offset_t bi)
 	 * We need to do this before i386at_init()
 	 * so that the symbol table's memory won't be stomped on.
 	 */
+	
 	if ((boot_info.flags & MULTIBOOT_AOUT_SYMS)
 	    && boot_info.syms.a.addr)
 	{

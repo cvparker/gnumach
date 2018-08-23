@@ -297,6 +297,24 @@ struct multiboot_os_info {
 };
 #endif /* ACKNOWLEDGE_MULTIBOOT_PROBS */
 
+#include <kern/macros.h>
+
+#define MULTIBOOT2_TAG_BASICMEM 	4
+#define MULTIBOOT2_TAG_MMAP		6
+#define MULTIBOOT2_TAG_MODULE		3
+#define MULTIBOOT2_TAG_CMDLINE		1
+#define MULTIBOOT2_TAG_FRAMEBUFFER	8
+
+struct multiboot2_start_tag {
+	uint32_t total_size;
+	uint32_t reserved;
+} __packed;
+
+struct multiboot2_generic_tag {
+	uint32_t type;
+	uint32_t size;
+} __packed;
+
 struct multiboot2_basicmem_tag {
 	uint32_t type;
 	uint32_t size;
@@ -316,6 +334,32 @@ struct multiboot2_raw_mmap_entry {
 	uint64_t length;
 	uint32_t type;
 	uint32_t reserved;
+} __packed;
+
+struct multiboot2_module_tag {
+	uint32_t type;
+	uint32_t size;
+	uint32_t mod_start;
+	uint32_t mod_end;
+	char string[1];
+} __packed;
+
+struct multiboot2_cmdline_tag {
+	uint32_t type;
+	uint32_t size;
+	char string[1];
+} __packed;
+
+struct multiboot2_framebuffer_tag {
+	uint32_t type;
+	uint32_t size;
+	uint64_t framebuffer_addr;
+	uint32_t framebuffer_pitch;
+	uint32_t framebuffer_width;
+	uint32_t framebuffer_height;
+	uint8_t framebuffer_bpp;
+	uint8_t framebuffer_type;
+	uint8_t reserved;
 } __packed;
 
 #endif /* _MACH_I386_MULTIBOOT_H_ */

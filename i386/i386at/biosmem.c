@@ -17,6 +17,7 @@
 
 #include <string.h>
 #include <i386/model_dep.h>
+#include <i386at/mb_parse.h>
 #include <i386at/biosmem.h>
 #include <kern/assert.h>
 #include <kern/debug.h>
@@ -616,17 +617,17 @@ biosmem_find_avail(phys_addr_t start, phys_addr_t end,
 #ifndef MACH_HYP
 
 static void __boot
-biosmem_setup_allocator(const struct multiboot_raw_info *mbi)
+biosmem_setup_allocator()
 {
     phys_addr_t heap_start, heap_end, max_heap_start, max_heap_end;
-    phys_addr_t start, end;
+    phys_addr_t start, end = 0;
     int error;
 
     /*
      * Find some memory for the heap. Look for the largest unused area in
      * upper memory, carefully avoiding all boot data.
      */
-    end = vm_page_trunc((mbi->mem_upper + 1024) << 10);
+    /*end = vm_page_trunc((mbi->mem_upper + 1024) << 10);*/
     
     /* CVP FIX: mbi->mem_upper + 1024 is simply the first memory hole */
     /* There may well be more memory at even higher addresses */
@@ -766,15 +767,22 @@ biosmem_xen_bootstrap(void)
 #else /* MACH_HYP */
 
 void __boot
-biosmem_bootstrap(const struct multiboot_raw_info *mbi)
+biosmem_bootstrap(const void *mbi)
 {
-    if (mbi->flags & MULTIBOOT_LOADER_MMAP)
-        biosmem_map_build(mbi);
+    const void *mmap_tag;
+    
+    mmap_tag = multiboot2_get_tag(mbi, MULTIBOOT2_TAG_MMAP);
+    if(mmap_tag)
+        biosmem_map_build((struct multiboot2_mmap_tag *)mmap_tag);
     else
-        biosmem_map_build_simple(mbi);
+    {
+        mmap_tag = multiboot2_get_tag(mbi, MULTIBOOT2_TAG_BASICMEM);
+	if(mmap_tag)
+	    biosmem_map_build_simple((struct multiboot2_basicmem_tag *)mmap_tag);
+    }
 
     biosmem_bootstrap_common();
-    biosmem_setup_allocator(mbi);
+    biosmem_setup_allocator();
 }
 
 #endif /* MACH_HYP */
