@@ -35,8 +35,11 @@
 #define	timename		"time"
 
 #ifndef	MACH_HYP
-#include <i386at/kd.h>
+
+#if 0
+# include <i386at/kd.h>
 #define	kdname			"kd"
+#endif /* 0 */
 
 #if	NCOM > 0
 #include <i386at/com.h>
@@ -49,12 +52,19 @@
 #endif	/* NLPR > 0 */
 #endif	/* MACH_HYP */
 
+#include <i386at/fbcons.h>
+#define fbname                  "fb"
+
+#if 0
 #include <i386at/kd_event.h>
 #define	kbdname			"kbd"
+#endif /* 0 */
 
 #ifndef	MACH_HYP
-#include <i386at/kd_mouse.h>
+#if 0
+# include <i386at/kd_mouse.h>
 #define	mousename		"mouse"
+#endif /* 0 */
 
 #include <i386at/mem.h>
 #define	memname			"mem"
@@ -93,10 +103,17 @@ struct dev_ops	dev_name_list[] =
 	  nomap,	nodev,	nulldev,	nulldev_portdeath,	0,
 	  nodev },
 #endif	/* ENABLE_IMMEDIATE_CONSOLE */
+#if 0
 	{ kdname,	kdopen,		kdclose,	kdread,
 	  kdwrite,	kdgetstat,	kdsetstat,	kdmmap,
 	  nodev,	nulldev,	kdportdeath,	0,
 	  nodev },
+#endif /* 0 */
+   {
+      fbname, fbopen, fbclose, fbread,
+	fbwrite, fbgetstat, fbsetstat, fbmmap,
+	nodev, nulldev, fbportdeath, 0, nodev
+   },
 #endif	/* MACH_HYP */
 
 	{ timename,	timeopen,	timeclose,	nulldev_read,
@@ -118,7 +135,7 @@ struct dev_ops	dev_name_list[] =
 	  nodev,	nulldev,	lprportdeath,	0,
 	  nodev },
 #endif
-
+#if 0
 	{ mousename,	mouseopen,	mouseclose,	mouseread,
 	  nulldev_write,	mousegetstat,	nulldev_setstat,	nomap,
 	  nodev,	nulldev,	nulldev_portdeath,	0,
@@ -128,7 +145,7 @@ struct dev_ops	dev_name_list[] =
 	  nulldev_write,	kbdgetstat,	kbdsetstat,	nomap,
 	  nodev,	nulldev,	nulldev_portdeath,	0,
 	  nodev },
-
+#endif /* 0 */
 	{ memname,	nulldev_open,	nulldev_close,	nulldev_read,
 	  nulldev_write,	nulldev_getstat,	nulldev_setstat,		memmmap,
 	  nodev,	nulldev,	nulldev_portdeath,	0,

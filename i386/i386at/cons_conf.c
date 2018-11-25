@@ -33,7 +33,10 @@
 #ifdef	MACH_HYP
 #include <xen/console.h>
 #else	/* MACH_HYP */
+#if 0
 #include "kd.h"
+#endif
+#include "fbcons.h"
 #if NCOM > 0
 #include "com.h"
 #endif
@@ -54,7 +57,10 @@ struct	consdev constab[] = {
 #if	ENABLE_IMMEDIATE_CONSOLE
 	{"immc", immc_cnprobe,	immc_cninit,	immc_cngetc,	immc_cnputc},
 #endif	/* ENABLE_IMMEDIATE_CONSOLE */
-	{"kd",	kdcnprobe,	kdcninit,	kdcngetc,	kdcnputc},
+#if 0
+        {"kd",	kdcnprobe,	kdcninit,	kdcngetc,	kdcnputc},
+#endif /* 0 */
+        {"fb",  fbcnprobe,      fbcninit,       fbcngetc,       fbcnputc},
 #if NCOM > 0
 	{"com",	comcnprobe,	comcninit,	comcngetc,	comcnputc},
 #endif
