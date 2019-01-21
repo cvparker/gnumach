@@ -245,7 +245,8 @@ void halt_all_cpus(boolean_t reboot)
 #ifdef	MACH_HYP
 	    hyp_halt();
 #endif	/* MACH_HYP */
-	    printf("In tight loop: hit ctl-alt-del to reboot\n");
+	    printf("Shutdown completed successfully, now in tight loop.\n");
+	    printf("You can safely power off the system or hit ctl-alt-del to reboot\n");
 	    (void) spl0();
 	}
 	while (TRUE)
@@ -616,7 +617,7 @@ void c_boot_entry(vm_offset_t bi)
 #include <vm/pmap.h>
 #include <mach/time_value.h>
 
-int
+vm_offset_t
 timemmap(dev, off, prot)
 	dev_t dev;
 	vm_offset_t off;

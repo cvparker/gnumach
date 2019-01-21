@@ -83,8 +83,13 @@
 #include <i386/proc_reg.h>
 #include <i386/locore.h>
 #include <i386/model_dep.h>
+#include <i386/spl.h>
 #include <i386at/biosmem.h>
 #include <i386at/model_dep.h>
+
+#if	NCPUS > 1
+#include <i386/mp_desc.h>
+#endif
 
 #ifdef	MACH_PSEUDO_PHYS
 #define	WRITE_PTE(pte_p, pte_entry)		*(pte_p) = pte_entry?pa_to_ma(pte_entry):0;
@@ -543,7 +548,7 @@ vm_offset_t pmap_map_bd(
 	if (prot & VM_PROT_WRITE)
 	    template |= INTEL_PTE_WRITE;
 
-	PMAP_READ_LOCK(pmap, spl);
+	PMAP_READ_LOCK(kernel_pmap, spl);
 	while (start < end) {
 		pte = pmap_pte(kernel_pmap, virt);
 		if (pte == PT_ENTRY_NULL)
@@ -572,7 +577,7 @@ vm_offset_t pmap_map_bd(
 	if (n != i)
 		panic("couldn't pmap_map_bd\n");
 #endif	/* MACH_PV_PAGETABLES */
-	PMAP_READ_UNLOCK(pmap, spl);
+	PMAP_READ_UNLOCK(kernel_pmap, spl);
 	return(virt);
 }
 
@@ -1370,7 +1375,7 @@ void pmap_reference(pmap_t p)
  *	Assumes that the pte-page exists.
  */
 
-/* static */
+static
 void pmap_remove_range(
 	pmap_t			pmap,
 	vm_offset_t		va,
@@ -1533,7 +1538,6 @@ void pmap_remove(
 	vm_offset_t	e)
 {
 	int			spl;
-	pt_entry_t		*pde;
 	pt_entry_t		*spte, *epte;
 	vm_offset_t		l;
 	vm_offset_t		_s = s;
@@ -1543,8 +1547,9 @@ void pmap_remove(
 
 	PMAP_READ_LOCK(map, spl);
 
-	pde = pmap_pde(map, s);
 	while (s < e) {
+	    pt_entry_t *pde = pmap_pde(map, s);
+
 	    l = (s + PDE_MAPPED_SIZE) & ~(PDE_MAPPED_SIZE-1);
 	    if (l > e)
 		l = e;
@@ -1555,7 +1560,6 @@ void pmap_remove(
 		pmap_remove_range(map, s, spte, epte);
 	    }
 	    s = l;
-	    pde++;
 	}
 	PMAP_UPDATE_TLBS(map, _s, e);
 
@@ -1921,7 +1925,7 @@ Retry:
 		 * Would have to enter the new page-table page in
 		 * EVERY pmap.
 		 */
-		panic("pmap_expand kernel pmap to %#x", v);
+		panic("pmap_expand kernel pmap to %#lx", v);
 	    }
 
 	    /*
@@ -1953,7 +1957,6 @@ Retry:
 	     * Enter the new page table page in the page directory.
 	     */
 	    i = ptes_per_vm_page;
-	    /*XX pdp = &pmap->dirbase[pdenum(v) & ~(i-1)];*/
 	    pdp = pmap_pde(pmap, v);
 	    do {
 #ifdef	MACH_PV_PAGETABLES
@@ -1970,7 +1973,7 @@ Retry:
 					        | INTEL_PTE_USER
 					        | INTEL_PTE_WRITE;
 #endif	/* MACH_PV_PAGETABLES */
-		pdp++;
+		pdp++;	/* Note: This is safe b/c we stay in one page.  */
 		ptp += INTEL_PGBYTES;
 	    } while (--i > 0);
 
@@ -2386,7 +2389,7 @@ void pmap_collect(pmap_t p)
  */
 #if	0
 void pmap_activate(my_pmap, th, my_cpu)
-	register pmap_t	my_pmap;
+	pmap_t	my_pmap;
 	thread_t	th;
 	int		my_cpu;
 {
@@ -2429,9 +2432,9 @@ pmap_t pmap_kernel()
  */
 #if	0
 pmap_zero_page(phys)
-	register vm_offset_t	phys;
+	vm_offset_t	phys;
 {
-	register int	i;
+	int	i;
 
 	assert(phys != vm_page_fictitious_addr);
 	i = PAGE_SIZE / INTEL_PGBYTES;

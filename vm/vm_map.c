@@ -102,7 +102,7 @@ MACRO_END
  *	are now "top level" maps (either task map, kernel map or submap
  *	of the kernel map).
  *
- *	Since portions of maps are specified by start/end addreses,
+ *	Since portions of maps are specified by start/end addresses,
  *	which may not align with existing map entries, all
  *	routines merely "clip" entries to these start/end values.
  *	[That is, an entry is split into two, bordering at a
@@ -216,7 +216,7 @@ vm_map_t vm_map_create(
 
 	result = (vm_map_t) kmem_cache_alloc(&vm_map_cache);
 	if (result == VM_MAP_NULL)
-		panic("vm_map_create");
+		return VM_MAP_NULL;
 
 	vm_map_setup(result, pmap, min, max);
 
@@ -685,7 +685,7 @@ restart:
 		start = (map->min_offset + mask) & ~mask;
 		end = start + size;
 
-		if ((end <= start) || (end > map->max_offset)) {
+		if ((start < map->min_offset) || (end <= start) || (end > map->max_offset)) {
 			goto error;
 		}
 
@@ -699,7 +699,8 @@ restart:
 		start = (entry->vme_end + mask) & ~mask;
 		end = start + size;
 
-		if ((end > start)
+		if ((start >= entry->vme_end)
+		    && (end > start)
 		    && (end <= map->max_offset)
 		    && (end <= (entry->vme_end + entry->gap_size))) {
 			*startp = start;
@@ -738,6 +739,7 @@ restart:
 
 	assert(entry->gap_size >= max_size);
 	start = (entry->vme_end + mask) & ~mask;
+	assert(start >= entry->vme_end);
 	end = start + size;
 	assert(end > start);
 	assert(end <= (entry->vme_end + entry->gap_size));
@@ -2793,7 +2795,7 @@ kern_return_t vm_map_copyout(
 			m = vm_page_lookup(object, offset);
 			if (m == VM_PAGE_NULL || m->wire_count == 0 ||
 			    m->absent)
-			    panic("vm_map_copyout: wiring 0x%x", m);
+			    panic("vm_map_copyout: wiring %p", m);
 
 			m->busy = TRUE;
 			vm_object_unlock(object);
@@ -4245,6 +4247,10 @@ vm_map_t vm_map_fork(vm_map_t old_map)
 	new_map = vm_map_create(new_pmap,
 			old_map->min_offset,
 			old_map->max_offset);
+	if (new_pmap == PMAP_NULL) {
+		pmap_destroy(new_pmap);
+		return VM_MAP_NULL;
+	}
 
 	for (
 	    old_entry = vm_map_first_entry(old_map);
@@ -4861,6 +4867,37 @@ kern_return_t vm_map_machine_attribute(
 
 	return ret;
 }
+
+/*
+ *	Routine:	vm_map_msync
+ *	Purpose:
+ *		Synchronize out pages of the given map out to their memory
+ *		manager, if any.
+ */
+kern_return_t vm_map_msync(
+	vm_map_t	map,
+	vm_offset_t	address,
+	vm_size_t	size,
+	vm_sync_t	sync_flags)
+{
+	if (map == VM_MAP_NULL)
+		KERN_INVALID_ARGUMENT;
+
+	if (sync_flags & (VM_SYNC_ASYNCHRONOUS | VM_SYNC_SYNCHRONOUS) ==
+			 (VM_SYNC_ASYNCHRONOUS | VM_SYNC_SYNCHRONOUS))
+		KERN_INVALID_ARGUMENT;
+
+	size =	round_page(address + size) - trunc_page(address);
+	address = trunc_page(address);
+
+	if (size == 0)
+		return KERN_SUCCESS;
+
+	/* TODO */
+
+	return KERN_INVALID_ARGUMENT;
+}
+
 
 
 #if	MACH_KDB

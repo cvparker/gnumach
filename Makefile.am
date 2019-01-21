@@ -54,6 +54,9 @@ AM_CPPFLAGS += \
 AM_CFLAGS += \
 	-fno-builtin-log
 
+AM_CCASFLAGS += \
+	-D__ASSEMBLY__
+
 # Yes, this makes the eyes hurt.  But perhaps someone will finally take care of
 # all that scruffy Mach code...  Also see <http://savannah.gnu.org/task/?5726>.
 AM_CFLAGS += \
@@ -74,6 +77,10 @@ if disable_smashing_stack_protector
 AM_CFLAGS += \
 	-fno-stack-protector
 endif
+
+# We do not support or need position-independent
+AM_CFLAGS += \
+	-no-pie -fno-pic
 
 #
 # Silent build support.
@@ -163,8 +170,9 @@ noinst_PROGRAMS += \
 # This is the list of routines we decide is OK to steal from the C library.
 clib_routines := htonl htons ntohl ntohs			\
 		 udivdi3 __udivdi3 __udivmoddi4 __umoddi3	\
+		 __divdi3 					\
 		 __rel_iplt_start __rel_iplt_end		\
-		 __ffsdi2					\
+		 __ffsdi2 ffs					\
 		 _START _start etext _edata end _end # actually ld magic, not libc.
 gnumach-undef: gnumach.$(OBJEXT)
 	$(NM_V) $(NM) -u $< | sed 's/  *U  *//' | sort -u > $@
@@ -198,7 +206,8 @@ exec_boot_PROGRAMS = \
 #
 
 EXTRA_DIST += \
-	config.status.dep.patch
+	config.status.dep.patch \
+	Makefile.in.dep.patch
 
 EXTRA_DIST += \
 	DEVELOPMENT

@@ -122,7 +122,7 @@ lpropen(dev_t dev, int flag, io_req_t ior)
 	tp = &lpr_tty[unit];
 	addr = (u_short) isai->address;
 	tp->t_dev = dev;
-	tp->t_addr = addr;
+	tp->t_addr = (void*) (natural_t) addr;
 	tp->t_oproc = lprstart;
 	tp->t_state |= TS_WOPEN;
 	tp->t_stop = lprstop;
@@ -178,9 +178,9 @@ mach_port_t	port;
 io_return_t
 lprgetstat(dev, flavor, data, count)
 dev_t		dev;
-int		flavor;
-int		*data;		/* pointer to OUT array */
-natural_t	*count;		/* out */
+dev_flavor_t	flavor;
+dev_status_t	data;		/* pointer to OUT array */
+mach_msg_type_number_t	*count;		/* out */
 {
 	io_return_t	result = D_SUCCESS;
 	int		unit = minor(dev);
@@ -196,9 +196,9 @@ natural_t	*count;		/* out */
 io_return_t
 lprsetstat(
 	dev_t		dev,
-	int		flavor,
-	int *		data,
-	natural_t	count)
+	dev_flavor_t	flavor,
+	dev_status_t	data,
+	mach_msg_type_number_t	count)
 {
 	io_return_t	result = D_SUCCESS;
 	int 		unit = minor(dev);
