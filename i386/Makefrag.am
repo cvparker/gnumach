@@ -57,7 +57,11 @@ libkernel_a_SOURCES += \
 	i386/i386at/mem.h \
 	i386/i386at/pic_isa.c \
 	i386/i386at/rtc.c \
-	i386/i386at/rtc.h
+	i386/i386at/rtc.h \
+    i386/i386at/fbcons.c \
+    i386/i386at/fbcons.h \
+    i386/i386at/mb_parse.c \
+    i386/i386at/mb_parse.h
 endif
 
 #

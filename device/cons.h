@@ -40,6 +40,7 @@ struct consdev {
 #define CN_NORMAL	1	/* device exists but is nothing special */
 #define CN_INTERNAL	2	/* "internal" bit-mapped display */
 #define CN_REMOTE	3	/* serial interface with remote bit set */
+#define CN_FRAMEBUFFER  4 /* the framebuffer - we want to use this for now */
 
 #define CONSBUFSIZE	1024
 

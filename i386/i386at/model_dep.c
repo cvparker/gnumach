@@ -531,7 +531,7 @@ void c_boot_entry(vm_offset_t bi)
 	 * so that the symbol table's memory won't be stomped on.
 	 */
 	
-	if ((boot_info.flags & MULTIBOOT_AOUT_SYMS)
+	/*if ((boot_info.flags & MULTIBOOT_AOUT_SYMS)
 	    && boot_info.syms.a.addr)
 	{
 		vm_size_t symtab_size, strtab_size;
@@ -544,18 +544,18 @@ void c_boot_entry(vm_offset_t bi)
 		printf("kernel symbol table at %08lx-%08lx (%d,%d)\n",
 		       kern_sym_start, kern_sym_end,
 		       symtab_size, strtab_size);
-	}
-
-	if ((boot_info.flags & MULTIBOOT_ELF_SHDR)
-	    && boot_info.syms.e.num)
-	{
-		elf_shdr_num = boot_info.syms.e.num;
-		elf_shdr_size = boot_info.syms.e.size;
-		elf_shdr_addr = (vm_offset_t)phystokv(boot_info.syms.e.addr);
-		elf_shdr_shndx = boot_info.syms.e.shndx;
+	}*/
+    
+    const struct multiboot2_elf_sym_tag *elf_symbols;
+	elf_symbols = (const struct multiboot2_elf_sym_tag *)multiboot2_get_tag(boot_info, MULTIBOOT2_TAG_ELF_SYM);
+	if (elf_symbols != NULL) {
+        elf_shdr_num = elf_symbols->num;
+        elf_shdr_size = elf_symbols->entsize;
+        elf_shdr_addr = (vm_offset_t)phystokv(elf_symbols->section_headers);
+        elf_shdr_shndx = elf_symbols->shndx;
 
 		printf("ELF section header table at %08lx\n", elf_shdr_addr);
-	}
+	}    
 #endif	/* MACH_KDB */
 #endif	/* MACH_XEN */
 
